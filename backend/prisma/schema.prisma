@@ -14,61 +14,71 @@ enum Role {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
-  password String
-  role     Role   @default(CONDUCTEUR)
-  otp      String?
-  otpExpiry DateTime?
-  otpForgetPass String?
+  id              Int       @id @default(autoincrement())
+  email           String    @unique
+  password        String
+  role            Role      @default(CONDUCTEUR)
+  otp             String?
+  otpExpiry       DateTime?
+  otpForgetPass   String?
   otpForgetExpiry DateTime?
-  active   Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active          Boolean   @default(false)
 
   userInfo UserInfo?
+  Delivery Delivery[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model UserInfo {
   id           Int       @id @default(autoincrement())
   firstName    String
   lastName     String
-  phoneNumber  String?
-  address      String?
+  phoneNumber  String
+  adress       String
   profileImage String?
   birthDate    DateTime?
-  
-  user         User      @relation(fields: [userId], references: [id])
-  userId       Int       @unique
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int  @unique
+
+  Delivery Delivery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum DeliveryStatus {
+  sl3aflDepot
+  sl3a5arjt
+  sl3awoslt
 }
 
 model Delivery {
-  id         Int      @id @default(autoincrement())
-  truckId    Int?    
-  clientId   Int      
-  routeId    Int?
-  conductorId Int?
+  id Int @id @default(autoincrement())
+  status DeliveryStatus @default(sl3aflDepot)
 
-  status     String   @default("PENDING") 
-  code       String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
+  UserInfo UserInfo @relation(fields: [clientId], references: [id])
+  clientId Int     
 
+  truck   Truck @relation(fields: [truckId], references: [id])
+  truckId Int   
 
+  user        User @relation(fields: [conductorId], references: [id])
+  conductorId Int  
 
-
-model Article {
-    id           Int       @id @default(autoincrement())
-  title        String
-
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Truck {
-  id        Int     @id @default(autoincrement())
-  plate     String  @unique
-  model     String
+  id    Int    @id @default(autoincrement())
+  plate String @unique
+  model String
+
+  Delivery Delivery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
-

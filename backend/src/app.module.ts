@@ -5,12 +5,10 @@ import { MailerModule } from './mailer/mailer.module';
 import { APP_GUARD } from '@nestjs/core';
 import { ActiveUserGuard, AtGuard } from './common/guards';
 import { UserModule } from './user/user.module';
-import { ArticleModule } from './article/article.module';
-import { TrucksModule } from './trucks/trucks.module';
-import { DeliveriesModule } from './deliveries/deliveries.module';
+import { DeliveryModule } from './delivery/delivery.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, MailerModule, UserModule, ArticleModule, TrucksModule, DeliveriesModule],
+  imports: [DatabaseModule, AuthModule, MailerModule, UserModule, DeliveryModule],
   providers: [
     {
       provide: APP_GUARD,
@@ -22,4 +20,4 @@ import { DeliveriesModule } from './deliveries/deliveries.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

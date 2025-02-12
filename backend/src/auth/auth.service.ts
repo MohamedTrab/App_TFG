@@ -70,6 +70,8 @@ export class AuthService {
       where: { id: user.id },
       data: { active: true, otp: null, otpExpiry: null },
     });
+
+    return {"message":"jwk bhy"}
   }
 
   async login(loginData: LoginDto): Promise<Tokens> {
@@ -77,7 +79,7 @@ export class AuthService {
       where: { email: loginData.email },
     });
     if (!userExist) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
     if (!userExist.active) {
