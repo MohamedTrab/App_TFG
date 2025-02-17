@@ -23,27 +23,15 @@ model User {
   otpForgetPass   String?
   otpForgetExpiry DateTime?
   active          Boolean   @default(false)
+  firstName       String?
+  lastName        String?
+  phoneNumber     String?
+  adress          String?
+  profileImage    String?
+  birthDate       DateTime?
 
-  userInfo UserInfo?
-  Delivery Delivery[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model UserInfo {
-  id           Int       @id @default(autoincrement())
-  firstName    String
-  lastName     String
-  phoneNumber  String
-  adress       String
-  profileImage String?
-  birthDate    DateTime?
-
-  user   User @relation(fields: [userId], references: [id])
-  userId Int  @unique
-
-  Delivery Delivery[]
+  Delivery   Delivery[]
+  deliveries Delivery[] @relation("ClientDeliveries") // Fixed relation name
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -56,17 +44,17 @@ enum DeliveryStatus {
 }
 
 model Delivery {
-  id Int @id @default(autoincrement())
+  id     Int            @id @default(autoincrement())
   status DeliveryStatus @default(sl3aflDepot)
 
-  UserInfo UserInfo @relation(fields: [clientId], references: [id])
-  clientId Int     
+  client   User @relation("ClientDeliveries", fields: [clientId], references: [id])
+  clientId Int
 
-  truck   Truck @relation(fields: [truckId], references: [id])
-  truckId Int   
+  truck   Truck @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  truckId Int
 
   user        User @relation(fields: [conductorId], references: [id])
-  conductorId Int  
+  conductorId Int
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

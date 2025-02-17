@@ -6,9 +6,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { ActiveUserGuard, AtGuard } from './common/guards';
 import { UserModule } from './user/user.module';
 import { DeliveryModule } from './delivery/delivery.module';
+import { TruckModule } from './truck/truck.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, MailerModule, UserModule, DeliveryModule],
+  imports: [DatabaseModule, AuthModule, MailerModule, UserModule, DeliveryModule, TruckModule],
   providers: [
     {
       provide: APP_GUARD,
