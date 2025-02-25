@@ -1,9 +1,41 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
+import { DeliveryStatus } from '@prisma/client';
+import { MailerService } from 'src/mailer/mailer.service';
+
 
 @Injectable()
 export class DeliveryService {
-  constructor(private readonly prisma: DatabaseService) {}
+  constructor(
+    private readonly prisma: DatabaseService,
+    private readonly mailerService: MailerService
+
+  ) {}
+
+  async conductorArrivesAtDepot(deliveryId: number, userId: number) {
+    const delivery = await this.prisma.delivery.findFirst({
+      where: { id: deliveryId },
+    });
+  
+    if (!delivery) {
+      throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
+    }
+  
+    if (delivery.conductorId !== userId) {
+      throw new HttpException('No tienes permiso para modificar este delivery', HttpStatus.FORBIDDEN);
+    }
+  
+    // Guardar la hora de llegada del conductor al almacén
+    const updatedDelivery = await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        arrivalAtDepot: new Date(), // 🕒 Guarda la fecha y hora actual
+      },
+    });
+  
+    return updatedDelivery;
+  }
+  
 
   async createDelivery(data) {
     const { truckId, clientId, conductorId } = data;
@@ -54,12 +86,16 @@ export class DeliveryService {
     //i5dmhom houni
     /**
 
-    *
-    * cond update sl3a 5rjt
-    * yji mail ll client li sl3a 5rjt 
+    *ZEDT El get all ou update l delivery
+    * cond update sl3a 5rjt //cest bon l cond ibdl ken ki tebda f depot ihotha kharjet
+    * yji mail ll client li sl3a 5rjt  // andi mochkla fel logique mtaa l envoie de mail el beki mrigel, averifier la logique de lenvoie de mail hne ggdhdwa 
     * 
     * 
-    * client yconfermi : update sl3a wolst
+    * client yconfermi : update sl3a wolst //cest bon l cond ibdl ken ki tebda kharjet ihotha woslt
+    * 
+    * zeedt tasjil wakt f khrouj w wsoul ta kol status
+    * zedt status ki youssel chauff
+    * zedt fonction wakteh wsel l chauff lel mamal
     * 
 
     */
@@ -86,6 +122,11 @@ export class DeliveryService {
     await this.prisma.delivery.delete({ where: { id } });
 
     return { message: 'Entrega eliminada correctamente' };
+  }
+
+    // Obtener todos los deliveries
+  async getAllDelivery() {
+    return await this.prisma.delivery.findMany();
   }
 
   async getDeliveryById(id) {
@@ -116,4 +157,120 @@ export class DeliveryService {
 
     return delivery;
   }
+
+  async updateDelivery(id, data: { status?: DeliveryStatus; clientId?: number; conductorId?: number; truckId?: number }) {
+    const existingDelivery = await this.prisma.delivery.findFirst({ where: { id:+id } });
+
+    if (!existingDelivery) {
+      throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
+    }
+
+    // Verificar si el nuevo cliente, conductor o camión existen antes de actualizar
+    if (data.clientId) {
+      const clientExists = await this.prisma.user.findFirst({ where: { id: data.clientId, role: 'CLIENT' } });
+      if (!clientExists) throw new HttpException('Cliente no válido', HttpStatus.BAD_REQUEST);
+    }
+
+    if (data.conductorId) {
+      const conductorExists = await this.prisma.user.findFirst({ where: { id: data.conductorId, role: 'CONDUCTEUR' } });
+      if (!conductorExists) throw new HttpException('Conductor no válido', HttpStatus.BAD_REQUEST);
+    }
+
+    if (data.truckId) {
+      const truckExists = await this.prisma.truck.findFirst({ where: { id: data.truckId } });
+      if (!truckExists) throw new HttpException('Camión no válido', HttpStatus.BAD_REQUEST);
+    }
+
+    return await this.prisma.delivery.update({
+      where: { id },
+      data: {
+        status: data.status,
+        clientId: data.clientId,
+        conductorId: data.conductorId,
+        truckId: data.truckId,
+      },
+    });
+  }
+
+  // ✅ Conductor solo puede cambiar el estado de sl3aflDepot → sl3a5arjt → sel3awoslotkodemclient
+  async conductorUpdateStatus(deliveryId: number, userId: string) {
+    const delivery = await this.prisma.delivery.findFirst({
+      where: { id: deliveryId },
+      include: { client: true }, // Para acceder al correo del cliente
+    });
+
+    if (!delivery) {
+      throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
+    }
+
+    if (delivery.conductorId !== +userId) {
+      throw new HttpException('No tienes permiso para modificar este delivery', HttpStatus.FORBIDDEN);
+    }
+
+    let updatedDelivery;
+
+    if (delivery.status === DeliveryStatus.sl3aflDepot) {
+      // Cambiar estado a "sl3a5arjt" y registrar la hora de salida
+      updatedDelivery = await this.prisma.delivery.update({
+        where: { id: deliveryId },
+        data: {
+          status: DeliveryStatus.sl3a5arjt,
+          dispatchedAt: new Date(),
+        },
+      });
+
+      // Enviar email al cliente
+      await this.mailerService.sendMail({
+        to: delivery.client.email, // Correo del cliente
+        subject: 'Confirmación de salida del producto',
+        text: `Estimado cliente, su producto ha salido y está en camino. Gracias por confiar en nosotros.`,
+      });
+
+    } else if (delivery.status === DeliveryStatus.sl3a5arjt) {
+      // Cambiar estado a "sel3awoslotkodemclient" y registrar la hora de entrega
+      updatedDelivery = await this.prisma.delivery.update({
+        where: { id: deliveryId },
+        data: {
+          status: DeliveryStatus.sel3awoslotkodemclient,
+          livredAtCond: new Date(),
+        },
+      });
+
+      // Enviar email al cliente notificando la entrega
+      await this.mailerService.sendMail({
+        to: delivery.client.email,
+        subject: 'Producto entregado',
+        text: `Estimado cliente, su pedido ha sido entregado con éxito. ¡Gracias por su compra!`,
+      });
+
+    } else {
+      throw new HttpException('No puedes cambiar el estado desde el estado actual', HttpStatus.FORBIDDEN);
+    }
+
+    return updatedDelivery;
+  }
+
+    // ✅ Cliente solo puede cambiar de sl3a5arjt a sl3awoslt
+    async clientUpdateStatus(deliveryId, userId) {
+      const delivery = await this.prisma.delivery.findFirst({
+        where: { id: deliveryId },
+      });
+  
+      if (!delivery) {
+        throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
+      }
+  
+      if (delivery.clientId !== +userId) {
+        throw new HttpException('No tienes permiso para modificar este delivery', HttpStatus.FORBIDDEN);
+      }
+  
+      if (delivery.status !== DeliveryStatus.sel3awoslotkodemclient) {
+        throw new HttpException('Solo puedes cambiar el estado desde sel3awoslotkodemclient', HttpStatus.FORBIDDEN);
+      }
+  
+      return await this.prisma.delivery.update({
+        where: { id: deliveryId },
+        data: { status: DeliveryStatus.sl3awoslt,livredAtClient: new Date() },
+      });
+    }
 }

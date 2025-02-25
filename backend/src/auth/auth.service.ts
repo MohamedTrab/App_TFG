@@ -71,7 +71,7 @@ export class AuthService {
       data: { active: true, otp: null, otpExpiry: null },
     });
 
-    return {"message":"jwk bhy"}
+    return {"message":"Usuario Verificado con Exito"}
   }
 
   async login(loginData: LoginDto): Promise<Tokens> {
