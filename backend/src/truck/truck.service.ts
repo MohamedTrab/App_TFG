@@ -74,6 +74,6 @@ export class TruckService {
       where: { id:+id },
     });
 
-    return {message :"truck delted"}
+    return {message :"Camión eliminado"}
   }
 }

@@ -18,7 +18,7 @@ export class DeliveryService {
     });
   
     if (!delivery) {
-      throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
+      throw new HttpException('Entregq no encontrada', HttpStatus.NOT_FOUND);
     }
   
     if (delivery.conductorId !== userId) {
@@ -97,6 +97,14 @@ export class DeliveryService {
     * zedt status ki youssel chauff
     * zedt fonction wakteh wsel l chauff lel mamal
     * 
+    * 
+    * 
+    * Rakaht wahdy :
+    * amalt formulaire html lel mail
+    * rakaht ljoumal kol bel espanol
+    * zedt mta l mdp oub
+    * 
+    * 
 
     */
 
@@ -108,7 +116,7 @@ export class DeliveryService {
       },
     });
     if (deliveryCreated) {
-      throw new HttpException('delivery created', HttpStatus.CREATED);
+      throw new HttpException('Entrega creada', HttpStatus.CREATED);
     }
   }
 
@@ -116,7 +124,7 @@ export class DeliveryService {
     const delivery = await this.prisma.delivery.findUnique({ where: { id } });
 
     if (!delivery) {
-      throw new HttpException('Delivery not found', HttpStatus.NOT_FOUND);
+      throw new HttpException('Entrega no encontrada', HttpStatus.NOT_FOUND);
     }
 
     await this.prisma.delivery.delete({ where: { id } });
@@ -152,7 +160,7 @@ export class DeliveryService {
     });
 
     if (!delivery) {
-      throw new HttpException('Delivery not found', HttpStatus.NOT_FOUND);
+      throw new HttpException('Entrega no encontrada', HttpStatus.NOT_FOUND);
     }
 
     return delivery;
@@ -162,7 +170,7 @@ export class DeliveryService {
     const existingDelivery = await this.prisma.delivery.findFirst({ where: { id:+id } });
 
     if (!existingDelivery) {
-      throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
+      throw new HttpException('Entrega no encontrada', HttpStatus.NOT_FOUND);
     }
 
     // Verificar si el nuevo cliente, conductor o camión existen antes de actualizar
@@ -200,7 +208,7 @@ export class DeliveryService {
     });
 
     if (!delivery) {
-      throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
+      throw new HttpException('Entrega no encontrada', HttpStatus.NOT_FOUND);
     }
 
     if (delivery.conductorId !== +userId) {
@@ -220,11 +228,13 @@ export class DeliveryService {
       });
 
       // Enviar email al cliente
-      await this.mailerService.sendMail({
-        to: delivery.client.email, // Correo del cliente
-        subject: 'Confirmación de salida del producto',
-        text: `Estimado cliente, su producto ha salido y está en camino. Gracias por confiar en nosotros.`,
-      });
+      await this.mailerService.sendMail(
+        delivery.client.email,
+        'Confirmación de salida del producto',
+        'Estimado cliente, su producto ha salido y está en camino. Gracias por confiar en nosotros.',
+        'https://miapp.com/seguimiento',
+        'Seguir mi pedido'
+      );
 
     } else if (delivery.status === DeliveryStatus.sl3a5arjt) {
       // Cambiar estado a "sel3awoslotkodemclient" y registrar la hora de entrega
@@ -237,11 +247,12 @@ export class DeliveryService {
       });
 
       // Enviar email al cliente notificando la entrega
-      await this.mailerService.sendMail({
-        to: delivery.client.email,
-        subject: 'Producto entregado',
-        text: `Estimado cliente, su pedido ha sido entregado con éxito. ¡Gracias por su compra!`,
-      });
+
+      await this.mailerService.sendMail(
+        delivery.client.email,
+        'Pedido en el local, pendiente de entrega',
+        'Estimado cliente, su pedido ha llegado a su local y está pendiente de entrega. ¡Gracias por su paciencia!',
+      );
 
     } else {
       throw new HttpException('No puedes cambiar el estado desde el estado actual', HttpStatus.FORBIDDEN);
@@ -251,26 +262,49 @@ export class DeliveryService {
   }
 
     // ✅ Cliente solo puede cambiar de sl3a5arjt a sl3awoslt
-    async clientUpdateStatus(deliveryId, userId) {
-      const delivery = await this.prisma.delivery.findFirst({
-        where: { id: deliveryId },
-      });
-  
-      if (!delivery) {
-        throw new HttpException('Delivery no encontrado', HttpStatus.NOT_FOUND);
-      }
-  
-      if (delivery.clientId !== +userId) {
-        throw new HttpException('No tienes permiso para modificar este delivery', HttpStatus.FORBIDDEN);
-      }
-  
-      if (delivery.status !== DeliveryStatus.sel3awoslotkodemclient) {
-        throw new HttpException('Solo puedes cambiar el estado desde sel3awoslotkodemclient', HttpStatus.FORBIDDEN);
-      }
-  
-      return await this.prisma.delivery.update({
-        where: { id: deliveryId },
-        data: { status: DeliveryStatus.sl3awoslt,livredAtClient: new Date() },
-      });
+  // ✅ Cliente solo puede cambiar el estado de sel3awoslotkodemclient → sl3awoslt
+  async clientUpdateStatus(deliveryId: number, userId: string) {
+    const delivery = await this.prisma.delivery.findFirst({
+      where: { id: deliveryId },
+      include: { client: true }, // Para acceder al correo del cliente
+    });
+
+    if (!delivery) {
+      throw new HttpException('Entrega no encontrada', HttpStatus.NOT_FOUND);
     }
+
+    if (delivery.clientId !== +userId) {
+      throw new HttpException('No tienes permiso para modificar este delivery', HttpStatus.FORBIDDEN);
+    }
+
+    let updatedDelivery;
+
+    if (delivery.status === DeliveryStatus.sel3awoslotkodemclient) {
+      // Cambiar estado a "sl3awoslt" y registrar la hora de entrega
+      updatedDelivery = await this.prisma.delivery.update({
+        where: { id: deliveryId },
+        data: {
+          status: DeliveryStatus.sl3awoslt,
+          livredAtClient: new Date(),
+        },
+      });
+
+      // Enviar email al cliente
+      await this.mailerService.sendMail(
+        delivery.client.email,
+        'Pedido entregado con éxito',
+        'Estimado cliente, su pedido ha sido entregado con éxito. ¡Gracias por su compra!',
+        'https://miapp.com/soporte',
+        'Contactar soporte'
+      );
+    } else {
+      throw new HttpException(
+        'Solo puedes cambiar el estado desde sel3awoslotkodemclient',
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    return updatedDelivery;
+  }
+
 }

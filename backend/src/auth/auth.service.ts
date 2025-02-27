@@ -21,11 +21,11 @@ export class AuthService {
       where: { email: data.email },
     });
     if (!user) {
-      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      throw new HttpException('Usuario no encontrado', HttpStatus.NOT_FOUND);
     }
 
     if (user.active) {
-      throw new HttpException('User is already active', HttpStatus.BAD_REQUEST);
+      throw new HttpException('El usuario ya está activo', HttpStatus.BAD_REQUEST);
     }
 
     const otp = authenticator.generate(process.env.OTP_SECRET);
@@ -36,11 +36,11 @@ export class AuthService {
       data: { otp, otpExpiry: expiry },
     });
 
-    await this.mailerService.sendMail({
-      to: user.email,
-      subject: 'Your OTP Code',
-      text: `Your OTP is: ${otp}. It will expire in 5 minutes.`,
-    });
+    await this.mailerService.sendMail(
+      user.email,
+      'Tu código OTP',
+      `Tu OTP es: <strong>${otp}</strong>. Expirará en 5 minutos.`
+    );
   }
 
   async otpVerify(email: string, code: string) {
@@ -49,19 +49,19 @@ export class AuthService {
     });
 
     if (user.active) {
-      throw new HttpException('User is already active', HttpStatus.BAD_REQUEST);
+      throw new HttpException('El usuario ya está activo', HttpStatus.BAD_REQUEST);
     }
 
     if (!user || !user.otp || !user.otpExpiry) {
       throw new HttpException(
-        'Invalid or expired OTP',
+        'OTP inválido o expirado',
         HttpStatus.UNAUTHORIZED,
       );
     }
 
     if (user.otp !== code || user.otpExpiry < new Date()) {
       throw new HttpException(
-        'Invalid or expired OTP',
+        'OTP inválido o expirado',
         HttpStatus.UNAUTHORIZED,
       );
     }
@@ -71,7 +71,15 @@ export class AuthService {
       data: { active: true, otp: null, otpExpiry: null },
     });
 
-    return {"message":"Usuario Verificado con Exito"}
+    await this.mailerService.sendMail(
+      user.email,
+      'Cuenta activada',
+      'Tu cuenta ha sido activada con éxito. Puedes iniciar sesión ahora.',
+      'https://miapp.com/login',
+      'Iniciar sesión'
+    );
+
+    return { "message": "Usuario Verificado con Exito" };
   }
 
   async login(loginData: LoginDto): Promise<Tokens> {
@@ -79,11 +87,11 @@ export class AuthService {
       where: { email: loginData.email },
     });
     if (!userExist) {
-       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+       throw new HttpException('Usuario no encontrado', HttpStatus.NOT_FOUND);
     }
 
     if (!userExist.active) {
-      throw new HttpException('User is not activated', HttpStatus.BAD_REQUEST);
+      throw new HttpException('El usuario no está activado', HttpStatus.BAD_REQUEST);
     }
 
     const passwordMatch = await argon2.verify(
@@ -91,7 +99,7 @@ export class AuthService {
       loginData.password,
     );
     if (!passwordMatch) {
-      throw new HttpException('Invalid password', HttpStatus.BAD_REQUEST);
+      throw new HttpException('Contraseña inválida', HttpStatus.BAD_REQUEST);
     }
 
     const tokens = await this.tokenService.generateTokens(
@@ -108,7 +116,7 @@ export class AuthService {
       where: { email: signupData.email },
     });
     if (userExist) {
-      throw new HttpException('User already exists', HttpStatus.CONFLICT);
+      throw new HttpException('El usuario ya existe', HttpStatus.CONFLICT);
     }
 
     const hashedPassword = await argon2.hash(signupData.password);
@@ -118,16 +126,62 @@ export class AuthService {
         password: hashedPassword,
       },
     });
-    
-    await this.mailerService.sendMail({
-      to: newUser.email,
-      subject: 'Account Created',
-      text: 'Your account has been created successfully',
-    });
 
-    return { message: 'User created successfully' };
-  } ;
-  async forgotpassword (forgotPasswrodDto){
-
+    return { message: 'Usuario creado con éxito' };
   }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+  
+    if (!user) {
+      throw new HttpException('Usuario no encontrado', HttpStatus.NOT_FOUND);
+    }
+  
+    const otp = authenticator.generate(process.env.OTP_SECRET);
+    const expiry = new Date(Date.now() + 5 * 60 * 1000); // OTP válido por 5 minutos
+  
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { otpForgetPass: otp, otpForgetExpiry: expiry },
+    });
+  
+    await this.mailerService.sendMail(
+      user.email,
+      'Recuperación de contraseña',
+      `Tu código de recuperación es: <strong>${otp}</strong>. Expirará en 5 minutos.`,
+    );
+  
+    return { message: 'Código de recuperación enviado' };
+  }
+  
+  async resetPassword(email: string, otp: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+  
+    if (!user || !user.otpForgetPass || !user.otpForgetExpiry) {
+      throw new HttpException('Código inválido o expirado', HttpStatus.UNAUTHORIZED);
+    }
+  
+    if (user.otpForgetPass !== otp || user.otpForgetExpiry < new Date()) {
+      throw new HttpException('Código inválido o expirado', HttpStatus.UNAUTHORIZED);
+    }
+  
+    const hashedPassword = await argon2.hash(newPassword);
+  
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        otpForgetPass: null,
+        otpForgetExpiry: null,
+      },
+    });
+  
+    return { message: 'Contraseña restablecida con éxito' };
+  }
+
+  
 }
